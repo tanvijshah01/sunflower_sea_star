@@ -16,12 +16,17 @@ library(rnaturalearthdata) #map data
 library(patchwork) # for stacking figures
 library(sp)#For dealing with spatial data
 library(adehabitatHR)# for home range estimation
+library(ggtext)
 
 # get Sunflower Seastar data from iNaturalist
 library(rinat)
 
 obs_seastar <- get_inat_obs(taxon_id = 47673, 
                             quality = "research", maxresults = 10000)
+
+# write.csv(obs_seastar,
+#           file = "~/Desktop/obs_seastar.csv",
+#           row.names = FALSE)
 
 # cleaning data dates
 obs_seastar_clean <- obs_seastar |>
@@ -212,43 +217,64 @@ lat_lollipop <- ggplot(lat_summary, aes(x = year)) +
            xmax = 2017,
            ymin = -Inf,
            ymax = Inf,
-           fill = "orangered",
+           fill = "#cc7b10",
            alpha = 0.5) +
+  
+  geom_text(
+    aes(x = 2015, y = Inf, label = "SWD"),
+    vjust = 1.5,
+    family = "Arial",
+    color = "#a8640d",
+    size = 3
+  ) +
   
   # Vertical line from min to max
   geom_segment(aes(xend = year,
                    y = min_lat,
                    yend = max_lat),
                linewidth = 0.5,
-               color = "turquoise4") +
+               color = "#283b54",
+               alpha = 0.5) +
   
-  # Min point
-  geom_point(aes(y = min_lat),
-             size = 2,
-             color = "yellow4") +
-  
-  # Median point
-  geom_point(aes(y = median_lat),
-             size = 2,
-             color = "turquoise4") +
-  
-  # Max point
-  geom_point(aes(y = max_lat),
-             size = 2,
-             color = "darkorange3") +
+  # Points
+  geom_point(aes(y = min_lat), size = 2, color = "#283b54") +
+  geom_point(aes(y = median_lat), size = 2, color = "#236a86") +
+  geom_point(aes(y = max_lat), size = 2, color = "#1d99b8") +
   
   labs(
     title = "Sunflower Seastar Observations",
-    subtitle = "Latitudinal Range",
+    subtitle = "Annual Latitudinal 
+  <span style='color:#1d99b8'>Max</span>, 
+  <span style='color:#236a86'>Median</span>, 
+  and <span style='color:#283b54'>Min</span>",
     x = NULL,
     y = "Latitude (°N)"
   ) +
   
   theme_minimal(base_size = 14) +
   theme(
-    panel.grid.major.y = element_line(color = "gray80"),
-    panel.grid.minor.y = element_line(color = "gray80"),
-    panel.grid.major.x = element_blank()
+    
+    # Sans font
+    plot.title = element_text(family = "Times",
+                              color = "gray40"),
+    plot.subtitle = element_markdown(
+      family = "Times",
+      color = "gray40"
+    ),
+    
+    # Axis lines
+    axis.line.x = element_line(color = "black"),
+    axis.line.y = element_line(color = "black"),
+    
+    # Tick marks
+    axis.ticks.x = element_line(color = "black"),
+    axis.ticks.y = element_line(color = "black"),
+    
+    # Grid lines (only y major)
+    panel.grid.major.y = element_line(color = "grey85"),
+    panel.grid.minor.y = element_blank(),
+    panel.grid.major.x = element_blank(),
+    panel.grid.minor.x = element_blank()
   )
 
 lat_lollipop
@@ -272,12 +298,22 @@ lat_range_plot <- ggplot(range_value, aes(x = year, y = lat_range)) +
            xmax = 2017,
            ymin = -Inf,
            ymax = Inf,
-           fill = "orangered",
+           fill = "#cc7b10",
            alpha = 0.5) +
   
+  geom_text(
+    aes(x = 2015, y = Inf, label = "SWD"),
+    vjust = 1.5,
+    family = "Arial",
+    color = "#a8640d",
+    size = 3
+  ) +
+  
   # Line + points (drawn on top)
-  geom_line(color = "turquoise4", linewidth = 1, alpha = 0.5) +
-  geom_point(color = "turquoise4", size = 2) +
+  geom_line(color = "#283b54", 
+            linewidth = 1, 
+            alpha = 0.5) +
+  geom_point(color = "#236a86", size = 2) +
   
   labs(
     title = "Sunflower Seastar Observations",
@@ -288,9 +324,24 @@ lat_range_plot <- ggplot(range_value, aes(x = year, y = lat_range)) +
   
   theme_minimal(base_size = 14) +
   theme(
-    panel.grid.major.y = element_line(color = "gray80"),
-    panel.grid.minor.y = element_line(color = "gray80"),
-    panel.grid.major.x = element_blank()
+    plot.title = element_text(family = "Times",
+                              color = "gray40"),
+    plot.subtitle = element_text(family = "Times",
+                                 color = "gray40"),
+    
+    # Axis lines
+    axis.line.x = element_line(color = "black"),
+    axis.line.y = element_line(color = "black"),
+    
+    # Tick marks
+    axis.ticks.x = element_line(color = "black"),
+    axis.ticks.y = element_line(color = "black"),
+    
+    # Grid lines (only y major)
+    panel.grid.major.y = element_line(color = "grey85"),
+    panel.grid.minor.y = element_blank(),
+    panel.grid.major.x = element_blank(),
+    panel.grid.minor.x = element_blank()
   )
 
 lat_range_plot
