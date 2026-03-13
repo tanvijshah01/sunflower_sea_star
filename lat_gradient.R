@@ -110,7 +110,7 @@ theme_bolb <-
     panel.grid.major.x = element_blank(),
     panel.grid.major.y = element_line(color = col_grid_maj, linewidth = 0.35),
     panel.grid.minor = element_blank(),
-    plot.margin = margin(t = 0, r = 0, b = 0, l = 0)
+    plot.margin = margin(t = 5, r = 5, b = 5, l = 5)
   )
 
 theme_bolb_map <- theme_bolb +
@@ -244,12 +244,17 @@ all_points_map <- ggplot() +
     xlim = c(bbox$swlng - 1, bbox$nelng + 1),
     ylim = c(bbox$swlat - 1, bbox$nelat + 1),
     expand = FALSE
-  ) +
-  labs(
-    title = "All sunflower sea star observations",
-    subtitle = "Filtered research-grade observations, 2008–2022"
-  ) +
-  theme_bolb_map
+  )+
+  theme_bolb_map+
+  theme(plot.margin = margin(t = 10, r = 20, b = 10, l = 20))
+  # theme(
+  #   axis.title = element_blank(),
+  #   axis.text  = element_blank(),
+  #   axis.text.x = element_blank(),
+  #   axis.text.y = element_blank(),
+  #   axis.ticks = element_blank(),
+  #   axis.line  = element_blank()
+  # )
 
 # -----------------------------
 # Pull and clean anemone data for effort standardization
@@ -433,15 +438,16 @@ plot_clean_map <- function(df_clean, title_txt, use_weights = FALSE) {
       expand = FALSE
     ) +
     labs(title = title_txt) +
-    theme_bolb_map +
-    theme(
-      axis.title = element_blank(),
-      axis.text  = element_blank(),
-      axis.text.x = element_blank(),
-      axis.text.y = element_blank(),
-      axis.ticks = element_blank(),
-      axis.line  = element_blank()
-    )
+    theme_bolb_map+
+    theme(plot.margin = margin(t = 5, r = 10, b = 10, l = 5))
+    # theme(
+    #   axis.title = element_blank(),
+    #   axis.text  = element_blank(),
+    #   axis.text.x = element_blank(),
+    #   axis.text.y = element_blank(),
+    #   axis.ticks = element_blank(),
+    #   axis.line  = element_blank()
+    # )
 }
 
 plot_simple_lat_hist <- function(df_simple, title_txt, use_weights = FALSE) {
@@ -495,10 +501,10 @@ plot_simple_lat_hist <- function(df_simple, title_txt, use_weights = FALSE) {
   y_max <- if (length(hist_counts) == 0) 1 else max(hist_counts, na.rm = TRUE)
   x_limits_pad <- c(x_limits[1] - x_pad, x_limits[2] + x_pad)
   if (use_weights) {
-    y_limits_pad <- c(0, 100)
+    y_limits_pad <- c(0, 125)
     label_y <- 95
   } else {
-    y_limits_pad <- c(0, 500)
+    y_limits_pad <- c(0, 125)
     label_y <- 475
   }
   
@@ -575,12 +581,12 @@ plot_simple_lat_hist <- function(df_simple, title_txt, use_weights = FALSE) {
     coord_cartesian(
       xlim = x_limits_pad,
       ylim = y_limits_pad,
-      clip = "off"
+      clip = "on"
     ) +
     labs(
       title = title_txt,
       x = "Latitude (°N)",
-      y = ifelse(use_weights, "Weighted observations", "Number of observations")
+      y = ifelse(use_weights, "Weighted\n observations", "Number of observations")
     ) +
     theme_bolb_more_space
 }
@@ -591,9 +597,9 @@ plot_simple_lat_hist <- function(df_simple, title_txt, use_weights = FALSE) {
 p_sunflower_raw <- ggplot(yearly_effort_index, aes(x = year, y = sunflower_obs)) +
   geom_col(fill = "#003660", alpha = 0.85) +
   geom_vline(xintercept = c(2013, 2018), linetype = "dashed", color = "#434343") +
-  scale_x_continuous(breaks = seq(min(yearly_effort_index$year), max(yearly_effort_index$year), by = 1)) +
+  scale_x_continuous(breaks = seq(min(yearly_effort_index$year), max(yearly_effort_index$year), by = 2)) +
   labs(
-    title = "A. Raw sunflower seastar observations",
+    title = "A. Sunflower seastar observations",
     x = "Year",
     y = "Observations"
   ) +
@@ -602,9 +608,9 @@ p_sunflower_raw <- ggplot(yearly_effort_index, aes(x = year, y = sunflower_obs))
 p_anemone_raw <- ggplot(yearly_effort_index, aes(x = year, y = anemone_obs)) +
   geom_col(fill = "#d4a373", alpha = 0.85) +
   geom_vline(xintercept = c(2013, 2018), linetype = "dashed", color = "#434343") +
-  scale_x_continuous(breaks = seq(min(yearly_effort_index$year), max(yearly_effort_index$year), by = 1)) +
+  scale_x_continuous(breaks = seq(min(yearly_effort_index$year), max(yearly_effort_index$year), by = 2)) +
   labs(
-    title = "B. Raw anemone observations",
+    title = "B. Anemone observations",
     x = "Year",
     y = "Observations"
   ) +
@@ -614,21 +620,18 @@ p_standardized <- ggplot(yearly_effort_index, aes(x = year, y = effort_index)) +
   geom_line(color = "#003660", linewidth = 1.2) +
   geom_point(color = "#003660", size = 2.5) +
   geom_vline(xintercept = c(2013, 2018), linetype = "dashed", color = "#434343") +
-  scale_x_continuous(breaks = seq(min(yearly_effort_index$year), max(yearly_effort_index$year), by = 1)) +
+  scale_x_continuous(breaks = seq(min(yearly_effort_index$year), max(yearly_effort_index$year), by = 2)) +
   labs(
     title = "C. Standardized sunflower seastar occurrence",
     x = "Year",
-    y = "Sunflower seastar obs per\n anemone obs"
+    y = "Relative observations\n (seastar / anemone)"
   ) +
   theme_bolb
 
-standardization_figure <- p_sunflower_raw / p_anemone_raw / p_standardized +
-  plot_annotation(
-    title = "Standardizing sunflower sea star observations by observation effort"
-  )
+standardization_figure <- p_sunflower_raw / p_anemone_raw / p_standardized
 
-save_plot(standardization_figure, "standardization_workflow_anemone.png", w = 7, h = 10)
-save_plot(standardization_figure, "standardization_workflow_anemone.pdf", w = 7, h = 10)
+save_plot(standardization_figure, "standardization_workflow_anemone.png", w = 6.5, h = 8)
+save_plot(standardization_figure, "standardization_workflow_anemone.pdf", w = 6.5, h = 8)
 
 # -----------------------------
 # Build RAW plots
@@ -644,22 +647,28 @@ raw_after_hist  <- plot_simple_lat_hist(obs_after_simple_raw,  "After", use_weig
 # -----------------------------
 # Build NORMALIZED plots
 # -----------------------------
-norm_before_map <- plot_clean_map(obs_before_clean_norm, "Before (normalized)", use_weights = TRUE)
-norm_during_map <- plot_clean_map(obs_during_clean_norm, "During (normalized)", use_weights = TRUE)
-norm_after_map  <- plot_clean_map(obs_after_clean_norm,  "After (normalized)", use_weights = TRUE)
+norm_before_map <- plot_clean_map(obs_before_clean_norm, "Before", use_weights = TRUE)
+norm_during_map <- plot_clean_map(obs_during_clean_norm, "During", use_weights = TRUE)
+norm_after_map  <- plot_clean_map(obs_after_clean_norm,  "After", use_weights = TRUE)
 
-norm_before_hist <- plot_simple_lat_hist(obs_before_simple_norm, "Before (normalized)", use_weights = TRUE)
-norm_during_hist <- plot_simple_lat_hist(obs_during_simple_norm, "During (normalized)", use_weights = TRUE)
-norm_after_hist  <- plot_simple_lat_hist(obs_after_simple_norm,  "After (normalized)", use_weights = TRUE)
+norm_before_hist <- plot_simple_lat_hist(obs_before_simple_norm, "Before", use_weights = TRUE)
+norm_during_hist <- plot_simple_lat_hist(obs_during_simple_norm, "During", use_weights = TRUE)
+norm_after_hist  <- plot_simple_lat_hist(obs_after_simple_norm,  "After", use_weights = TRUE)
 
 # -----------------------------
 # Stack plots
 # -----------------------------
-homerange_raw <- raw_before_map / raw_during_map / raw_after_map
-lat_gradient_raw <- raw_before_hist / raw_during_hist / raw_after_hist
+homerange_raw <- raw_before_map + raw_during_map + raw_after_map +
+  plot_layout(axes = "collect_y", axis_titles = "collect_y")
 
-homerange_norm <- norm_before_map / norm_during_map / norm_after_map
-lat_gradient_norm <- norm_before_hist / norm_during_hist / norm_after_hist
+lat_gradient_raw <- raw_before_hist / raw_during_hist / raw_after_hist +
+  plot_layout(axes = "collect_x", axis_titles = "collect_x")
+
+homerange_norm <- norm_before_map + norm_during_map + norm_after_map +
+  plot_layout(axes = "collect_y", axis_titles = "collect_y")
+
+lat_gradient_norm <- norm_before_hist / norm_during_hist / norm_after_hist +
+  plot_layout(axes = "collect_x", axis_titles = "collect_x")
 
 # Optional side-by-side comparison layouts
 homerange_compare <- homerange_raw | homerange_norm
@@ -685,8 +694,8 @@ lat_gradient_compare
 # Save plots
 # -----------------------------
 
-save_plot(all_points_map, "all_seastar_points_map.png", w = 6.5, h = 3.25)
-save_plot(all_points_map, "all_seastar_points_map.pdf", w = 6.5, h = 3.25)
+save_plot(all_points_map, "all_seastar_points_map.png", w = 6.5, h = 4.5)
+save_plot(all_points_map, "all_seastar_points_map.pdf", w = 6.5, h = 4.5)
 
 save_plot(raw_before_map,  "raw_map_before_clean_mcp.png",  w = 6.5, h = 3.25)
 save_plot(raw_during_map,  "raw_map_during_clean_mcp.png",  w = 6.5, h = 3.25)
@@ -704,18 +713,19 @@ save_plot(norm_before_hist, "norm_hist_before_latitude.png", w = 6.5, h = 3.25)
 save_plot(norm_during_hist, "norm_hist_during_latitude.png", w = 6.5, h = 3.25)
 save_plot(norm_after_hist,  "norm_hist_after_latitude.png",  w = 6.5, h = 3.25)
 
-save_plot(homerange_raw,      "stack_homerange_maps_raw.png",         w = 6.5, h = 9)
-save_plot(lat_gradient_raw,   "stack_latitude_gradients_raw.png",     w = 6.5, h = 9)
-save_plot(homerange_norm,     "stack_homerange_maps_normalized.png",  w = 6.5, h = 9)
-save_plot(lat_gradient_norm,  "stack_latitude_gradients_normalized.png", w = 6.5, h = 9)
+save_plot(homerange_raw,      "stack_homerange_maps_raw.png",         w = 6.5, h = 8)
+save_plot(lat_gradient_raw,   "stack_latitude_gradients_raw.png",     w = 6.5, h = 8)
+save_plot(homerange_norm,     "stack_homerange_maps_normalized.png",  w = 6.5, h = 8)
+save_plot(lat_gradient_norm,  "stack_latitude_gradients_normalized.png", w = 6.5, h = 8)
+save_plot(standardization_figure,  "standardization_figure.png", w = 6.5, h = 8)
 
 save_plot(homerange_compare,   "compare_homerange_maps_raw_vs_norm.png",   w = 9, h = 6.5)
 save_plot(lat_gradient_compare, "compare_latitude_raw_vs_norm.png",        w = 9, h = 6.5)
 
-save_plot(homerange_raw,      "stack_homerange_maps_raw.pdf",         w = 6.5, h = 9)
-save_plot(lat_gradient_raw,   "stack_latitude_gradients_raw.pdf",     w = 6.5, h = 9)
-save_plot(homerange_norm,     "stack_homerange_maps_normalized.pdf",  w = 6.5, h = 9)
-save_plot(lat_gradient_norm,  "stack_latitude_gradients_normalized.pdf", w = 6.5, h = 9)
+save_plot(homerange_raw,      "stack_homerange_maps_raw.pdf",         w = 6.5, h = 8)
+save_plot(lat_gradient_raw,   "stack_latitude_gradients_raw.pdf",     w = 6.5, h = 8)
+save_plot(homerange_norm,     "stack_homerange_maps_normalized.pdf",  w = 6.5, h = 8)
+save_plot(lat_gradient_norm,  "stack_latitude_gradients_normalized.pdf", w = 6.5, h = 8)
 
-save_plot(homerange_compare,   "compare_homerange_maps_raw_vs_norm.pdf",   w = 9, h = 6.5)
-save_plot(lat_gradient_compare, "compare_latitude_raw_vs_norm.pdf",        w = 9, h = 6.5)
+save_plot(homerange_compare,   "compare_homerange_maps_raw_vs_norm.pdf",   w = 8, h = 6.5)
+save_plot(lat_gradient_compare, "compare_latitude_raw_vs_norm.pdf",        w = 8, h = 6.5)

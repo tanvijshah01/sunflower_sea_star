@@ -1,347 +1,385 @@
 ################## ESM 211: Sunflower Seastar Homeranges #################################
 ### Danielle Turner
-### February 2026
+### Updated to match current plotting theme and date windows
+##########################################################################################
 
-##########################################################################################
-##########################################################################################
-############################# SEPARATE DATA BY YEARS ####################################
+# -----------------------------
 # Packages
-library(here) #localized file paths
-library(tidyverse) #compendium of useful packages
-library(janitor) #cleans data
-library(rinat) #data interface for iNaturalist
-library(sf) # for converting and using simple features in maps
-library(rnaturalearth) #map data and functions
-library(rnaturalearthdata) #map data
-library(patchwork) # for stacking figures
-library(sp)#For dealing with spatial data
-library(adehabitatHR)# for home range estimation
-library(ggtext)
-
-# get Sunflower Seastar data from iNaturalist
+# -----------------------------
+library(here)
+library(tidyverse)
+library(janitor)
 library(rinat)
+library(sf)
+library(rnaturalearth)
+library(rnaturalearthdata)
+library(patchwork)
+library(sp)
+library(adehabitatHR)
+library(lubridate)
+library(showtext)
+library(sysfonts)
 
-obs_seastar <- get_inat_obs(taxon_id = 47673, 
-                            quality = "research", maxresults = 10000)
+# -----------------------------
+# Theme setup
+# -----------------------------
+font_add_google("EB Garamond", "eb_garamond")
 
-# write.csv(obs_seastar,
-#           file = "~/Desktop/obs_seastar.csv",
-#           row.names = FALSE)
+showtext_auto(TRUE)
+showtext_opts(dpi = 300)
 
-# cleaning data dates
-obs_seastar_clean <- obs_seastar |>
-  mutate(
-    datetime = as.numeric(substr(observed_on, 1, 4))
+col_title <- "#003660"
+col_text  <- "black"
+
+col_panel_bg <- "#FFFFFF"
+col_plot_bg  <- "#FFFFFF"
+
+col_axis     <- "black"
+col_grid_maj <- "#D9D9D9"
+
+theme_bolb <-
+  theme_minimal(base_size = 12, base_family = "eb_garamond") +
+  theme(
+    plot.title.position = "plot",
+    plot.title = element_text(
+      family = "eb_garamond",
+      face = "bold",
+      size = 14,
+      color = col_title,
+      hjust = 0,
+      margin = margin(b = 8)
+    ),
+    plot.subtitle.position = "plot",
+    plot.subtitle = element_text(
+      family = "eb_garamond",
+      face = "plain",
+      size = 12,
+      color = col_text,
+      hjust = 0,
+      margin = margin(b = 10)
+    ),
+    axis.title.x = element_text(
+      family = "eb_garamond",
+      face = "bold",
+      size = 12,
+      color = col_text,
+      margin = margin(t = 8)
+    ),
+    axis.title.y = element_text(
+      family = "eb_garamond",
+      face = "bold",
+      size = 12,
+      color = col_text,
+      margin = margin(r = 8)
+    ),
+    axis.text.x = element_text(
+      family = "eb_garamond",
+      size = 12,
+      color = col_text,
+      margin = margin(t = 4)
+    ),
+    axis.text.y = element_text(
+      family = "eb_garamond",
+      size = 12,
+      color = col_text,
+      margin = margin(r = 4)
+    ),
+    legend.title = element_text(
+      family = "eb_garamond",
+      face = "plain",
+      size = 12,
+      color = col_text
+    ),
+    legend.text = element_text(
+      family = "eb_garamond",
+      face = "plain",
+      size = 12,
+      color = col_text
+    ),
+    strip.text = element_text(
+      family = "eb_garamond",
+      face = "plain",
+      size = 12,
+      color = col_text
+    ),
+    plot.background  = element_rect(fill = col_plot_bg, color = NA),
+    panel.background = element_rect(fill = col_panel_bg, color = NA),
+    axis.line        = element_line(color = col_axis, linewidth = 0.5),
+    axis.ticks       = element_line(color = col_axis, linewidth = 0.5),
+    axis.ticks.length = unit(3, "pt"),
+    panel.grid.major.x = element_blank(),
+    panel.grid.major.y = element_line(color = col_grid_maj, linewidth = 0.35),
+    panel.grid.minor = element_blank(),
+    plot.margin = margin(t = 5, r = 5, b = 5, l = 5)
   )
 
+theme_bolb_map <- theme_bolb +
+  theme(
+    axis.title = element_blank(),
+    axis.text  = element_blank(),
+    axis.ticks = element_blank(),
+    panel.grid = element_blank()
+  )
 
-# split data frame into 3 new data frames: 
-# before (1973-2013), during (2013-2017), after (2017-present)
-library(dplyr)
-library(lubridate)
+theme_set(theme_bolb)
 
-obs_seastar_before <- obs_seastar |>
-  filter(year(datetime) < 2013)
+# -----------------------------
+# Time windows
+# -----------------------------
+yr_before_lo <- 2008
+yr_before_hi <- 2012
 
-obs_seastar_during <- obs_seastar |>
-  filter(year(datetime) >= 2013 & year(datetime) <= 2017)|>
-  filter(!is.na(latitude) & !is.na(longitude))
+yr_during_lo <- 2013
+yr_during_hi <- 2017
 
-obs_seastar_after <- obs_seastar |>
-  filter(year(datetime) > 2017)|>
-  filter(!is.na(latitude) & !is.na(longitude))
+yr_after_lo  <- 2018
+yr_after_hi  <- 2022
 
-
-################################################################################
-######################### BEFORE SWD HOMERANGE #################################
-
-# Convert to simple feature object.
-seastar_before_sf<-st_as_sf(obs_seastar_before, coords = c("longitude", "latitude"),crs = 4326) #Default CRS for many applications including R
-
-# Convert to spatial points
-seastar_before_proj<-st_transform(seastar_before_sf, 5070) # CRS ideal for HR estimation in the United States.  Area estimate is accurate. 
-seastar_before_sp_points<-SpatialPoints(coords=st_coordinates(seastar_before_proj), 
-                                        proj4string = CRS(st_crs(seastar_before_proj)$proj4string))
-
-# Calculate the MCPs
-seastar_before_mcp_90 <- mcp(
-  seastar_before_sp_points,
-  percent = 90)
-
-# Convert spatial points to simple feature for plotting
-seastar_before_mcp_sf <- st_as_sf(seastar_before_mcp_90) |>
-  st_transform(4326)
-
-# Get state boundaries
-states <- ne_states(country = "United States of America", returnclass = "sf")
-
-# Define boundaries of interest
+# -----------------------------
+# Study extent
+# -----------------------------
 bbox <- list(
-  swlat = 32.5,     # Southern California
-  swlng = -180,     # Far western Aleutians
-  nelat = 71.5,     # Northern Alaska coast
-  nelng = -117      # Inland edge of California coast
+  swlat = 30,
+  swlng = -180,
+  nelat = 60,
+  nelng = -110
 )
 
-# Create figure
-before_combined_mcp <- ggplot() +
-  geom_sf(data = states, fill = "white", color = "gray10", size=0.5) +
-  geom_sf(data = seastar_before_sf, color="steelblue", alpha = 0.6,size = 0.5)  +
-  geom_sf(data = seastar_before_mcp_sf, color="steelblue",size = 1)  +
-  coord_sf(xlim = c(bbox$swlng-1, bbox$nelng+1),
-           ylim = c(bbox$swlat-1, bbox$nelat+1)) +
-  labs(title = "Sunflower Seastar MCP",
-       subtitle = "Before SWD: 1978-2013") +
-  theme_void(base_size = 14)
+# -----------------------------
+# Get Sunflower Seastar data from iNaturalist
+# -----------------------------
+obs_seastar <- get_inat_obs(
+  taxon_id = 47673,
+  quality = "research",
+  maxresults = 10000
+) |>
+  janitor::clean_names()
 
-before_combined_mcp
-
-
-################################################################################
-######################### DURING SWD HOMERANGE #################################
-
-# Convert to simple feature object.
-seastar_during_sf<-st_as_sf(obs_seastar_during, coords = c("longitude", "latitude"),crs = 4326)
-
-# Convert to spatial points
-seastar_during_proj<-st_transform(seastar_during_sf, 5070) # CRS ideal for HR estimation in the United States.  Area estimate is accurate. 
-seastar_during_sp_points<-SpatialPoints(coords=st_coordinates(seastar_during_proj), 
-                                        proj4string = CRS(st_crs(seastar_during_proj)$proj4string))
-
-# Calculate the MCPs
-seastar_during_mcp_90 <- mcp(
-  seastar_during_sp_points,
-  percent = 90)
-
-# Convert spatial points to simple feature for plotting
-seastar_during_mcp_sf <- st_as_sf(seastar_during_mcp_90) |>
-  st_transform(4326)
-
-# # Get state boundaries
-# states <- ne_states(country = "United States of America", returnclass = "sf")
-# 
-# # Define boundaries of interest
-# bbox <- list(
-#   swlat = 32.5,     # Southern California
-#   swlng = -180,     # Far western Aleutians
-#   nelat = 71.5,     # Northern Alaska coast
-#   nelng = -117      # Inland edge of California coast
-# )
-
-# Create figure
-during_combined_mcp <- ggplot() +
-  geom_sf(data = states, fill = "white", color = "gray10", size=0.5) +
-  geom_sf(data = seastar_during_sf, color="darkorange", alpha = 0.6,size = 0.5)  +
-  geom_sf(data = seastar_during_mcp_sf, color="darkorange",size = 1)  +
-  coord_sf(xlim = c(bbox$swlng-1, bbox$nelng+1),
-           ylim = c(bbox$swlat-1, bbox$nelat+1)) +
-  labs(title = "Sunflower Seastar MCP",
-       subtitle = "During SWD: 2014-2017") +
-  theme_void(base_size = 14)
-
-during_combined_mcp
-
-################################################################################
-######################### AFTER SWD HOMERANGE #################################
-
-# Convert to simple feature object.
-seastar_after_sf<-st_as_sf(obs_seastar_after, coords = c("longitude", "latitude"),crs = 4326)
-
-# Convert to spatial points
-seastar_after_proj<-st_transform(seastar_after_sf, 5070) # CRS ideal for HR estimation in the United States.  Area estimate is accurate. 
-seastar_after_sp_points<-SpatialPoints(coords=st_coordinates(seastar_after_proj), 
-                                       proj4string = CRS(st_crs(seastar_after_proj)$proj4string))
-
-# Calculate the MCPs
-seastar_after_mcp_90 <- mcp(
-  seastar_after_sp_points,
-  percent = 90)
-
-# Convert spatial points to simple feature for plotting
-seastar_after_mcp_sf <- st_as_sf(seastar_after_mcp_90) |>
-  st_transform(4326)
-
-# # Get state boundaries
-# states <- ne_states(country = "United States of America", returnclass = "sf")
-# 
-# # Define boundaries of interest
-# bbox <- list(
-#   swlat = 32.5,     # Southern California
-#   swlng = -180,     # Far western Aleutians
-#   nelat = 71.5,     # Northern Alaska coast
-#   nelng = -117      # Inland edge of California coast
-# )
-
-# Create figure
-after_combined_mcp <- ggplot() +
-  geom_sf(data = states, fill = "white", color = "gray10", size=0.5) +
-  geom_sf(data = seastar_after_sf, color="darkblue", alpha = 0.6,size = 0.5)  +
-  geom_sf(data = seastar_after_mcp_sf, color="darkblue",size = 1)  +
-  coord_sf(xlim = c(bbox$swlng-1, bbox$nelng+1),
-           ylim = c(bbox$swlat-1, bbox$nelat+1)) +
-  labs(title = "Sunflower Seastar MCP",
-       subtitle = "After SWD: 2017-2026") +
-  theme_void(base_size = 14)
-
-after_combined_mcp
-
-
-
-##########################################################################################
-##########################################################################################
-############################# LOLLIPOP PLOT OF LAT RANGE ################################
-
+# -----------------------------
+# Clean dates + coordinates
+# -----------------------------
 obs_seastar_clean <- obs_seastar |>
   mutate(
     observed_on = as.Date(observed_on),
-    year = year(observed_on)
-  )
+    year = lubridate::year(observed_on)
+  ) |>
+  filter(
+    !is.na(year),
+    !is.na(latitude),
+    !is.na(longitude)
+  ) |>
+  filter(year >= yr_before_lo, year <= yr_after_hi)
 
-# create columns for min, max, and median latitudes per year
+# -----------------------------
+# Split data by time period
+# -----------------------------
+obs_seastar_before <- obs_seastar_clean |>
+  filter(year >= yr_before_lo, year <= yr_before_hi)
+
+obs_seastar_during <- obs_seastar_clean |>
+  filter(year >= yr_during_lo, year <= yr_during_hi)
+
+obs_seastar_after <- obs_seastar_clean |>
+  filter(year >= yr_after_lo, year <= yr_after_hi)
+
+# -----------------------------
+# Basemap
+# -----------------------------
+countries_3 <- ne_countries(scale = "medium", returnclass = "sf") |>
+  filter(admin %in% c("United States of America", "Canada", "Mexico"))
+
+states_3 <- ne_states(returnclass = "sf") |>
+  filter(geonunit %in% c("United States of America", "Canada", "Mexico"))
+
+# -----------------------------
+# Output folder + save helper
+# -----------------------------
+fig_dir <- here("figures")
+dir_create(fig_dir)
+
+save_plot <- function(p, filename, w = 10, h = 7, dpi = 400) {
+  ggsave(
+    filename = file.path(fig_dir, filename),
+    plot = p,
+    width = w,
+    height = h,
+    units = "in",
+    dpi = dpi
+  )
+}
+
+# -----------------------------
+# Helper for MCP
+# -----------------------------
+make_mcp_objects <- function(df, percent = 95, proj_epsg = 5070) {
+  if (nrow(df) < 3) return(list(points_sf = NULL, mcp_sf = NULL))
+  
+  pts_sf <- st_as_sf(df, coords = c("longitude", "latitude"), crs = 4326, remove = FALSE)
+  pts_proj <- st_transform(pts_sf, proj_epsg)
+  
+  pts_sp <- SpatialPoints(
+    coords = st_coordinates(pts_proj),
+    proj4string = CRS(st_crs(pts_proj)$proj4string)
+  )
+  
+  mcp_poly <- mcp(pts_sp, percent = percent)
+  
+  mcp_sf <- st_as_sf(mcp_poly) |>
+    st_transform(4326)
+  
+  list(points_sf = pts_sf, mcp_sf = mcp_sf)
+}
+
+plot_mcp_map <- function(df, subtitle_txt) {
+  res <- make_mcp_objects(df, percent = 95)
+  
+  if (is.null(res$mcp_sf)) {
+    return(
+      ggplot() +
+        labs(
+          title = "Sunflower sea star MCP",
+          subtitle = paste0(subtitle_txt, " (not enough points for MCP)")
+        ) +
+        theme_bolb
+    )
+  }
+  
+  ggplot() +
+    geom_sf(data = countries_3, fill = "white", color = "#434343") +
+    geom_sf(data = states_3, fill = NA, color = "#434343", linewidth = 0.3) +
+    geom_sf(data = res$mcp_sf, fill = "#faedcd", alpha = 0.5, color = NA) +
+    geom_sf(data = res$mcp_sf, fill = NA, color = "#d4a373", linewidth = 1) +
+    geom_sf(data = res$points_sf, color = "#003660", alpha = 0.6, size = 1.2) +
+    coord_sf(
+      xlim = c(bbox$swlng - 1, bbox$nelng + 1),
+      ylim = c(bbox$swlat - 1, bbox$nelat + 1),
+      expand = FALSE
+    ) +
+    labs(
+      title = "Sunflower sea star MCP",
+      subtitle = subtitle_txt
+    ) +
+    theme_bolb_map
+}
+
+# -----------------------------
+# MCP maps
+# -----------------------------
+before_combined_mcp <- plot_mcp_map(obs_seastar_before, "Before SWD: 2008–2012")
+during_combined_mcp <- plot_mcp_map(obs_seastar_during, "During SWD: 2013–2017")
+after_combined_mcp  <- plot_mcp_map(obs_seastar_after,  "After SWD: 2018–2022")
+
+before_combined_mcp
+during_combined_mcp
+after_combined_mcp
+
+# -----------------------------
+# Lollipop plot of annual latitude range
+# -----------------------------
 lat_summary <- obs_seastar_clean |>
-  filter(!is.na(latitude)) |>
   group_by(year) |>
   summarise(
-    min_lat = min(latitude),
-    median_lat = median(latitude),
-    max_lat = max(latitude),
+    min_lat = min(latitude, na.rm = TRUE),
+    median_lat = median(latitude, na.rm = TRUE),
+    max_lat = max(latitude, na.rm = TRUE),
     .groups = "drop"
   )
 
-# plot the graph
 lat_lollipop <- ggplot(lat_summary, aes(x = year)) +
-  
-  # DURING SWD SHADED REGION
-  annotate("rect",
-           xmin = 2013,
-           xmax = 2017,
-           ymin = -Inf,
-           ymax = Inf,
-           fill = "#cc7b10",
-           alpha = 0.5) +
-  
+  annotate(
+    "rect",
+    xmin = yr_during_lo,
+    xmax = yr_during_hi,
+    ymin = -Inf,
+    ymax = Inf,
+    fill = "#faedcd",
+    alpha = 0.5
+  ) +
   geom_text(
     aes(x = 2015, y = Inf, label = "SWD"),
     vjust = 1.5,
-    family = "Arial",
-    color = "#a8640d",
-    size = 3
+    family = "eb_garamond",
+    face = "bold",
+    color = "#d4a373",
+    size = 4
   ) +
-  
-  # Vertical line from min to max
-  geom_segment(aes(xend = year,
-                   y = min_lat,
-                   yend = max_lat),
-               linewidth = 0.5,
-               color = "#283b54",
-               alpha = 0.5) +
-  
-  # Points
-  geom_point(aes(y = min_lat), size = 2, color = "#283b54") +
-  geom_point(aes(y = median_lat), size = 2, color = "#236a86") +
-  geom_point(aes(y = max_lat), size = 2, color = "#1d99b8") +
-  
+  geom_segment(
+    aes(xend = year, y = min_lat, yend = max_lat),
+    linewidth = 0.6,
+    color = "#434343",
+    alpha = 0.8
+  ) +
+  geom_point(aes(y = min_lat), size = 2, color = "#003660") +
+  geom_point(aes(y = median_lat), size = 2.2, color = "#03859c") +
+  geom_point(aes(y = max_lat), size = 2, color = "#09a99a") +
+  scale_x_continuous(breaks = seq(min(lat_summary$year), max(lat_summary$year), by = 2)) +
   labs(
-    title = "Sunflower Seastar Observations",
-    subtitle = "Annual Latitudinal 
-  <span style='color:#1d99b8'>Max</span>, 
-  <span style='color:#236a86'>Median</span>, 
-  and <span style='color:#283b54'>Min</span>",
     x = NULL,
     y = "Latitude (°N)"
   ) +
-  
-  theme_minimal(base_size = 14) +
+  theme_bolb +
   theme(
-    
-    # Sans font
-    plot.title = element_text(family = "Times",
-                              color = "gray40"),
-    plot.subtitle = element_markdown(
-      family = "Times",
-      color = "gray40"
-    ),
-    
-    # Axis lines
-    axis.line.x = element_line(color = "black"),
-    axis.line.y = element_line(color = "black"),
-    
-    # Tick marks
-    axis.ticks.x = element_line(color = "black"),
-    axis.ticks.y = element_line(color = "black"),
-    
-    # Grid lines (only y major)
-    panel.grid.major.y = element_line(color = "grey85"),
-    panel.grid.minor.y = element_blank(),
     panel.grid.major.x = element_blank(),
-    panel.grid.minor.x = element_blank()
+    panel.grid.minor = element_blank()
   )
 
 lat_lollipop
 
-
-##########################################################################################
-##########################################################################################
-############################# PLOT OF TOTAL LAT RANGE PER YEAR ###########################
-
-# create column with total range value
+# -----------------------------
+# Plot of total latitudinal range per year
+# -----------------------------
 range_value <- lat_summary |>
-  mutate(year = as.numeric(year)) |>
-  mutate(lat_range = max_lat - min_lat)
+  mutate(
+    year = as.numeric(year),
+    lat_range = max_lat - min_lat
+  )
 
-# plot lat range over time
 lat_range_plot <- ggplot(range_value, aes(x = year, y = lat_range)) +
-  
-  # DURING SWD
-  annotate("rect",
-           xmin = 2013,
-           xmax = 2017,
-           ymin = -Inf,
-           ymax = Inf,
-           fill = "#cc7b10",
-           alpha = 0.5) +
-  
+  annotate(
+    "rect",
+    xmin = yr_during_lo,
+    xmax = yr_during_hi,
+    ymin = -Inf,
+    ymax = Inf,
+    fill = "#faedcd",
+    alpha = 0.5
+  ) +
   geom_text(
     aes(x = 2015, y = Inf, label = "SWD"),
     vjust = 1.5,
-    family = "Arial",
-    color = "#a8640d",
-    size = 3
+    family = "eb_garamond",
+    face = "bold",
+    color = "#d4a373",
+    size = 4
   ) +
-  
-  # Line + points (drawn on top)
-  geom_line(color = "#283b54", 
-            linewidth = 1, 
-            alpha = 0.5) +
-  geom_point(color = "#236a86", size = 2) +
-  
+  geom_line(color = "#434343", linewidth = 0.6, alpha = 0.8) +
+  geom_point(color = "#03859c", size = 2.2) +
+  scale_x_continuous(breaks = seq(min(range_value$year), max(range_value$year), by = 2)) +
   labs(
-    title = "Sunflower Seastar Observations",
-    subtitle = "Annual Latitudinal Range",
     x = NULL,
-    y = "Latitudinal Range (Max °N - Min °N)"
+    y = "Latitudinal range (max °N - min °N)"
   ) +
-  
-  theme_minimal(base_size = 14) +
+  theme_bolb +
   theme(
-    plot.title = element_text(family = "Times",
-                              color = "gray40"),
-    plot.subtitle = element_text(family = "Times",
-                                 color = "gray40"),
-    
-    # Axis lines
-    axis.line.x = element_line(color = "black"),
-    axis.line.y = element_line(color = "black"),
-    
-    # Tick marks
-    axis.ticks.x = element_line(color = "black"),
-    axis.ticks.y = element_line(color = "black"),
-    
-    # Grid lines (only y major)
-    panel.grid.major.y = element_line(color = "grey85"),
-    panel.grid.minor.y = element_blank(),
     panel.grid.major.x = element_blank(),
-    panel.grid.minor.x = element_blank()
+    panel.grid.minor = element_blank()
   )
 
 lat_range_plot
+
+# -----------------------------
+# Save plots
+# -----------------------------
+save_plot(before_combined_mcp, "before_combined_mcp.png", w = 6.5, h = 3.25)
+save_plot(during_combined_mcp, "during_combined_mcp.png", w = 6.5, h = 3.25)
+save_plot(after_combined_mcp,  "after_combined_mcp.png",  w = 6.5, h = 3.25)
+
+save_plot(lat_lollipop, "lat_lollipop.png", w = 6.5, h = 3.25)
+save_plot(lat_range_plot, "lat_range_plot.png", w = 6.5, h = 3.25)
+
+save_plot(before_combined_mcp, "before_combined_mcp.png", w = 6.5, h = 3.25)
+save_plot(during_combined_mcp, "during_combined_mcp.png", w = 6.5, h = 3.25)
+save_plot(after_combined_mcp,  "after_combined_mcp.png",  w = 6.5, h = 3.25)
+
+save_plot(lat_lollipop, "lat_lollipop.png", w = 6.5, h = 3.25)
+save_plot(lat_range_plot, "lat_range_plot.png", w = 6.5, h = 3.25)
